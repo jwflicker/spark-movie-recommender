@@ -57,9 +57,29 @@ object MovieRecommender {
     val testSet = x(1).map(row=>(row.getInt(0), row.getInt(1)))
     val predictions = model.predict(testSet)
     
-    val display = trainingSet.map(r=>(r, "training")).union(
-                  predictions.map(r=>(r, "prediction")))
-                  
-    println(display.first)
+    sqlContext.createDataFrame(
+      predictions.map(rating => Row(
+        rating.user,
+        rating.product,
+        rating.rating)),
+      StructType(Array(
+        StructField("userId", IntegerType, true),
+        StructField("movieId", IntegerType, true),
+        StructField("rating", DoubleType, true)))).registerTempTable("predictions")
+        
+        
+    sqlContext.sql("""
+      SELECT ratings.userId, movies.title, ratings.rating
+      from ratings join movies on ratings.movieId = movies.movieId 
+      where ratings.rating > 4.5 
+      order by ratings.userId, ratings.rating
+    """).show
+    
+    sqlContext.sql("""
+      SELECT predictions.userId, movies.title, predictions.rating
+      from predictions join movies on predictions.movieId = movies.movieId 
+      where predictions.rating > 4.5
+      order by predictions.userId , predictions.rating
+    """).show
   }
 }
